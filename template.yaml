@@ -1,0 +1,208 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  websocket-app
+
+  Sample application demonstrating websocket api
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.8
+    Architectures:
+      - x86_64
+
+Resources:
+
+  ConnectionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "connectionId"
+        AttributeType: "S"
+      - AttributeName: "userId"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "connectionId"
+        KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      TableName: "connection_Table"
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            -
+              AttributeName: "connectionId"
+              KeyType: "HASH"   
+            -
+              AttributeName: "userId"
+              KeyType: "RANGE"  
+          Projection:
+            ProjectionType: ALL  
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+        - IndexName: Connection_GSI
+          KeySchema:
+            -
+              AttributeName: "userId"
+              KeyType: "HASH"   
+            -
+              AttributeName: "connectionId"
+              KeyType: "RANGE"  
+          Projection:
+            ProjectionType: ALL  
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+
+  DemoWebSocket:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: DemoWebSocket
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref DemoWebSocket
+      RouteKey: $connect
+      AuthorizationType: NONE
+      OperationName: ConnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref ConnectIntegration
+  
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref DemoWebSocket
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      OperationName: DisconnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref DisconnectIntegration
+
+  SendMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref DemoWebSocket
+      RouteKey: sendmessage
+      AuthorizationType: NONE
+      OperationName: SendMessageRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref SendMessageIntegration
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref DemoWebSocket
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
+      # - ''
+      # - - 'arn:'
+      #   - ':apigateway:'
+      #   - !Ref 'AWS::Region'
+      #   - ':lambda:path/2015-03-31/functions/'
+      #   - !GetAtt OnConnectFunction.Arn
+      #   - /invocations
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref DemoWebSocket
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
+      # !Join - ''
+      # - - 'arn:'
+      #   - ':apigateway:'
+      #   - !Ref 'AWS::Region'
+      #   - ':lambda:path/2015-03-31/functions/'
+      #   - !GetAtt OnDisconnectFunction.Arn
+      #   - /invocations
+
+  SendMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref DemoWebSocket
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+      # - ''
+      # - - 'arn:'
+      #   - ':apigateway:'
+      #   - !Ref 'AWS::Region'
+      #   - ':lambda:path/2015-03-31/functions/'
+      #   - !GetAtt SendMessageFunction.Arn
+      #   - /invocations
+
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: Prod
+      Description: Prod Stage
+      ApiId: !Ref DemoWebSocket
+
+  OnConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: on_connect.lambda_handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnectionTable
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref ConnectionTable
+
+  OnDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: on_disconnect.lambda_handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnectionTable
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref ConnectionTable
+
+  SendMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: send_message.lambda_handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ConnectionTable
+          INDEX_NAME: !Ref Connection_GSI
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref ConnectionTable
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DemoWebSocket}/*'
+
+Outputs:
+
+  WebSocketURI:
+    Description: "The WSS URI to connect with the server"
+    Value: !Sub "wss://${DemoWebSocket}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/"
+  OnConnectFunction:
+    Description: "OnConnect Lambda Function ARN"
+    Value: !GetAtt OnConnectFunction.Arn
