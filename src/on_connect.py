@@ -5,10 +5,13 @@ dynamodb = boto3.resource('dynamodb')
 table_name = os.environ.get('TABLE_NAME')
 table = dynamodb.Table(table_name)
 
-def connect_db(connectionId):
+def connect_db(userId,connectionId):
     table_response = table.put_item(
         TableName = table_name,
-        Item=connectionId
+        Item={
+            'connectionId': connectionId,
+            'userId': userId
+        }
     )
     print(table_response)
     return table_response
@@ -16,10 +19,11 @@ def connect_db(connectionId):
 def lambda_handler(event, context):
 
     print(event)
-    connectionId = json.loads(event['requestContext']['connectionId'])
+    connectionId = event['requestContext']['connectionId']
+    userId = event['queryStringParameters']['userId']
 
     try:
-        response = connect_db(connectionId)
+        response = connect_db(connectionId,userId)
         return {
             "statusCode": 200,
             "body": json.dumps({
@@ -28,6 +32,7 @@ def lambda_handler(event, context):
             }),
         }
     except Exception as e:
+        print(e)
         return{
             "statusCode": 400,
             "body": json.dumps({
