@@ -4,60 +4,34 @@ dynamodb = boto3.resource('dynamodb')
 table_name = os.environ.get('TABLE_NAME')
 table = dynamodb.Table(table_name)
 
-
-def lambda_handler(event, context):
-
-    print(event)
-    connectionId = event['requestContext']['connectionId']
+def delete_connection(connectionId):
     table_response = table.delete_item(
         TableName = table_name,
         Key={
             'connectionId': connectionId,
         }
     ) 
-    return{
-        'statusCode': 200,
-        'body': json.dumps({
-            'response': table_response,
-            'message': 'connection deleted...'
-        })
-    }
+    print(table_response)
+    return table_response
 
-# import json, os
-# import boto3
+def lambda_handler(event, context):
 
-# dynamodb = boto3.resource('dynamodb')
-# table_name = os.environ.get('TABLE_NAME')
-# table = dynamodb.Table(table_name)
+    print(event)
+    connectionId = event['requestContext']['connectionId']
 
-# def delete_connection(connectionId):
-#     table_response = table.delete_item(
-#         TableName = table_name,
-#         Key={
-#             'connectionId': connectionId,
-#         }
-#     ) 
-#     print(table_response)
-#     return table_response
-
-# def lambda_handler(event, context):
-
-#     print(event)
-#     connectionId = event['requestContext']['connectionId']
-
-#     try:
-#         response = delete_connection(connectionId)
-#         return {
-#             "statusCode": 200,
-#             "body": json.dumps({
-#                 "result": response,
-#                 "message": "Disconnected...",
-#             }),
-#         }
-#     except Exception as e:
-#         return{
-#             "statusCode": 400,
-#             "body": json.dumps({
-#                 "message": "Unable to disconnect...",
-#             }),
-#         }
+    try:
+        response = delete_connection(connectionId)
+        return {
+            "statusCode": 200,
+            "body": json.dumps({
+                "result": response,
+                "message": "Disconnected...",
+            }),
+        }
+    except Exception as e:
+        return{
+            "statusCode": 400,
+            "body": json.dumps({
+                "message": "Some error occurred...",
+            }),
+        }

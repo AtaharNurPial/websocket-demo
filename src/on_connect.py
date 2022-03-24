@@ -5,17 +5,6 @@ dynamodb = boto3.resource('dynamodb')
 table_name = os.environ.get('TABLE_NAME')
 table = dynamodb.Table(table_name)
 
-# def connect_db(connectionId,userId):
-#     table_response = table.put_item(
-#         TableName = table_name,
-#         Item = {
-#             'connectionId': connectionId ,
-#             'userId': userId
-#         }
-#     )
-#     print(table_response)
-#     return table_response
-
 def connect_db(params):
     table_response = table.put_item(
         TableName = table_name,

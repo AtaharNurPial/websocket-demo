@@ -4,14 +4,18 @@ from boto3.dynamodb.conditions import Key
 
 dynamodb = boto3.resource('dynamodb')
 table_name = os.environ.get('TABLE_NAME')
-# index_name = os.environ.get('INDEX_NAME')
-# URL = os.environ.get('CONNECTION_URL')
+URL = os.environ.get('CONNECTION_URL')
 table = dynamodb.Table(table_name)
+client = boto3.client('apigatewaymanagementapi',endpoint_url = URL)
 
+def db_response(receiverId):
+    response = table.scan(
+        TableName = table_name,
+        FilterExpression = Key('userId').eq(receiverId)
+    )
+    return response
 
 def sendMessage(message,connectionId):
-    URL = 'https://azuk465590.execute-api.us-east-2.amazonaws.com/Prod'
-    client = boto3.client('apigatewaymanagementapi',endpoint_url = URL)
     response = client.post_to_connection(
     Data=message,
     ConnectionId=connectionId
@@ -25,10 +29,12 @@ def lambda_handler(event, context):
     body = json.loads(event['body'])
     receiverId = body['receiverId']
     message = body['message']
-    table_response = table.scan(
-        TableName = table_name,
-        FilterExpression = Key('userId').eq(receiverId)
-    )
+    table_response = db_response(receiverId)
+    # table_response = table.scan(
+    #     TableName = table_name,
+    #     FilterExpression = Key('userId').eq(receiverId)
+    # )
+    print(table_response)
     if table_response['Items'] is not None:
         receiverConnectionId = table_response['Items'][0]['connectionId']
         connection_response = table.scan(
