@@ -20,17 +20,29 @@ Resources:
       AttributeDefinitions:
       - AttributeName: "connectionId"
         AttributeType: "S"
-      # - AttributeName: "userId"
-      #   AttributeType: "S"
+      - AttributeName: "userId"
+        AttributeType: "S"
       KeySchema:
       - AttributeName: "connectionId"
         KeyType: "HASH"
-      # - AttributeName: "userId"
-      #   KeyType: "RANGE"
+      - AttributeName: "userId"
+        KeyType: "RANGE"
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
       TableName: "User_Table"
+      GlobalSecondaryIndexes:
+        - IndexName: MultiUserIndex
+          KeySchema:
+          - AttributeName: "userId"
+            KeyType: "HASH"
+          - AttributeName: "connectionId"
+            KeyType: "RANGE"
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
 
   DemoWebSocket:
     Type: AWS::ApiGatewayV2::Api
@@ -153,6 +165,7 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref ConnectionTable
+          INDEX_NAME: MultiUserIndex
           CONNECTION_URL: !Sub "https://${DemoWebSocket}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
       Policies:
       - DynamoDBCrudPolicy:
