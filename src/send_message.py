@@ -18,6 +18,7 @@ def db_response(receiverId):
     )
     return response
 
+<<<<<<< HEAD
 def sendMessage(message,connectionId):
     print('connectionIds List:',connectionId)
     # for connectionId in connectionIds:
@@ -27,6 +28,19 @@ def sendMessage(message,connectionId):
     )
     print('receiverConnectionId: ',connectionId)
     return response
+=======
+def sendMessage(message,connectionIds):
+    print('connectionIds',connectionIds)
+    responses = []
+    for connectionId in connectionIds:
+        client.post_to_connection(
+        Data=message,
+        ConnectionId=connectionId
+        )
+        print('receiverConnectionId: ',connectionId)
+        responses.extend(connectionId)
+    return responses
+>>>>>>> master
 
 def lambda_handler(event, context):
 
@@ -35,6 +49,7 @@ def lambda_handler(event, context):
     body = json.loads(event['body'])
     receiverId = body['receiverId']
     message = body['message']
+<<<<<<< HEAD
     # receiverConnectionIds = []
     table_response = db_response(receiverId)
     items = table_response['Items']
@@ -60,13 +75,61 @@ def lambda_handler(event, context):
             # )
             return{
                 'statusCode': 200,
+=======
+    try:
+        receiverConnectionIds = []
+        table_response = db_response(receiverId)
+        items = table_response['Items']
+        print('Items: ',items)
+        if items is not None:
+            for item in items:
+                res = [item['connectionId']]
+                receiverConnectionIds.extend(res)
+            print('receiverConnectionId list: ',receiverConnectionIds)
+            try:
+                connection_response = table.query(
+                    TableName = table_name,
+                    KeyConditionExpression = Key('connectionId').eq(connectionId)
+                )
+                if connection_response['Items'] is not None:
+                    senderId = connection_response['Items'][0]['userId']
+                    payload = json.dumps({'Message': message, 'senderId': senderId})
+                    try:
+                        sendMessage(message=payload,connectionIds=receiverConnectionIds)
+                        return{
+                            'statusCode': 200,
+                            'body': json.dumps({
+                                'result': payload,
+                                'message': "Message delivered..."
+                            })
+                        }
+                    except Exception as e:
+                        print(e)
+                        return{
+                            'statusCode': 400,
+                            'body': json.dumps({
+                            'message': "User is not connected."
+                            })
+                        }
+                else:
+                    return{
+                        'statusCode': 400,
+                        'body': json.dumps({
+                            'message': "Message could not be delivered..."
+                        })
+                    }
+            except Exception as e:
+                print(e)
+                return{
+                'statusCode': 400,
+>>>>>>> master
                 'body': json.dumps({
-                    'result': payload,
-                    'message': "Message delivered..."
+                'message': "User is not connected."
                 })
             }
         else:
             return{
+<<<<<<< HEAD
             'statusCode': 400,
             'body': json.dumps({
                 'message': "Message could not be delivered..."
@@ -81,11 +144,14 @@ def lambda_handler(event, context):
             #     }
     else:
         return{
+=======
+>>>>>>> master
                 'statusCode': 400,
                 'body': json.dumps({
-                    'message': "Message could not be delivered..."
+                'message': "User is not connected."
                 })
             }
+<<<<<<< HEAD
     # except Exception as e:
     #     return{
     #         'statusCode': 400,
@@ -111,3 +177,12 @@ def lambda_handler(event, context):
 
 
 
+=======
+    finally:
+        return{
+                'statusCode': 400,
+                'body': json.dumps({
+                'message': "User is not connected."
+                })
+            }
+>>>>>>> master
