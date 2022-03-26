@@ -19,13 +19,15 @@ def db_response(receiverId):
 
 def sendMessage(message,connectionIds):
     print('connectionIds',connectionIds)
+    responses = []
     for connectionId in connectionIds:
-        response = client.post_to_connection(
+        client.post_to_connection(
         Data=message,
         ConnectionId=connectionId
         )
         print('receiverConnectionId: ',connectionId)
-        return response
+        responses.extend(connectionId)
+    return responses
 
 def lambda_handler(event, context):
 
@@ -34,41 +36,67 @@ def lambda_handler(event, context):
     body = json.loads(event['body'])
     receiverId = body['receiverId']
     message = body['message']
-    receiverConnectionIds = []
-    table_response = db_response(receiverId)
-    items = table_response['Items']
-    print('Items: ',items)
-    if items is not None:
-        for item in items:
-            res = [item['connectionId']]
-            receiverConnectionIds.extend(res)
-        print('receiverConnectionId list: ',receiverConnectionIds)
-        connection_response = table.query(
-            TableName = table_name,
-            KeyConditionExpression = Key('connectionId').eq(connectionId)
-        )
-        if connection_response['Items'] is not None:
-            senderId = connection_response['Items'][0]['userId']
-            payload = json.dumps({'Message': message, 'senderId': senderId})
-            sendMessage(message=payload,connectionIds=receiverConnectionIds)
-            return{
-                'statusCode': 200,
+    try:
+        receiverConnectionIds = []
+        table_response = db_response(receiverId)
+        items = table_response['Items']
+        print('Items: ',items)
+        if items is not None:
+            for item in items:
+                res = [item['connectionId']]
+                receiverConnectionIds.extend(res)
+            print('receiverConnectionId list: ',receiverConnectionIds)
+            try:
+                connection_response = table.query(
+                    TableName = table_name,
+                    KeyConditionExpression = Key('connectionId').eq(connectionId)
+                )
+                if connection_response['Items'] is not None:
+                    senderId = connection_response['Items'][0]['userId']
+                    payload = json.dumps({'Message': message, 'senderId': senderId})
+                    try:
+                        sendMessage(message=payload,connectionIds=receiverConnectionIds)
+                        return{
+                            'statusCode': 200,
+                            'body': json.dumps({
+                                'result': payload,
+                                'message': "Message delivered..."
+                            })
+                        }
+                    except Exception as e:
+                        print(e)
+                        return{
+                            'statusCode': 400,
+                            'body': json.dumps({
+                            'message': "User is not connected."
+                            })
+                        }
+                else:
+                    return{
+                        'statusCode': 400,
+                        'body': json.dumps({
+                            'message': "Message could not be delivered..."
+                        })
+                    }
+            except Exception as e:
+                print(e)
+                return{
+                'statusCode': 400,
                 'body': json.dumps({
-                    'result': payload,
-                    'message': "Message delivered..."
+                'message': "User is not connected."
                 })
             }
         else:
             return{
-                'statusCode': 200,
+                'statusCode': 400,
                 'body': json.dumps({
-                    'message': "Message could not be delivered..."
+                'message': "User is not connected."
                 })
             }
-    else:
+    finally:
         return{
-            'statusCode': 200,
-            'body': json.dumps({
-            'message': "User is not connected."
-            })
-        }
+                'statusCode': 400,
+                'body': json.dumps({
+                'message': "User is not connected."
+                })
+            }
