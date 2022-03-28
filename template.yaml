@@ -208,7 +208,7 @@ Outputs:
 
   WebSocketURL:
     Description: "The WSS URI to connect with the server"
-    Value: !Sub "wss://${DemoWebSocket}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/"
+    Value: !Sub "wss://${DemoWebSocket}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/userId="
   WebSocketSendMessageURL:
     Description: "The http URL to send message across the server"
     Value: !Sub "https://${DemoWebSocket}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
